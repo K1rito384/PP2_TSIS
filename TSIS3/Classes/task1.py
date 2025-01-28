@@ -1,4 +1,3 @@
-import math
 class StringProcessor:
     def __init__(self):
         self.string = ""
