@@ -2,36 +2,30 @@ import pygame
 import os
 import datetime
 
-# Инициализация Pygame
 pygame.init()
 
-# Константы экрана
 WIDTH, HEIGHT = 600, 400
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Pygame Project")
 
-# Цвета
 WHITE = (255, 255, 255)
 RED = (255, 0, 0)
 
-# Координаты мяча
 ball_x, ball_y = WIDTH // 2, HEIGHT // 2
 BALL_RADIUS = 25
 BALL_SPEED = 20
 
-# Музыка
 pygame.mixer.init()
 MUSIC_FOLDER = os.path.join(os.path.dirname(__file__), "music")
 if not os.path.exists(MUSIC_FOLDER):
     os.makedirs(MUSIC_FOLDER)
 music_files = [f for f in os.listdir(MUSIC_FOLDER) if f.endswith(".mp3")]
 current_track = 0
-print("Music files found:", music_files)  # Отладка
+print("Music files found:", music_files)
 
-# Функция для проигрывания музыки
 def play_music():
     if music_files:
-        print("Playing:", music_files[current_track])  # Отладка
+        print("Playing:", music_files[current_track]) 
         pygame.mixer.music.load(os.path.join(MUSIC_FOLDER, music_files[current_track]))
         pygame.mixer.music.play()
     else:
@@ -52,7 +46,6 @@ def prev_track():
         current_track = (current_track - 1) % len(music_files)
         play_music()
 
-# Загрузка изображения часов
 clock_face = pygame.image.load(os.path.join(os.path.dirname(__file__), "mickeyclock.jpeg"))
 clock_face = pygame.transform.scale(clock_face, (200, 200))
 clock_rect = clock_face.get_rect(center=(WIDTH // 2, HEIGHT // 2))
@@ -62,12 +55,10 @@ running = True
 while running:
     screen.fill(WHITE)
     
-    # Обновление времени
     now = datetime.datetime.now()
-    minute_angle = -(now.minute * 6)  # 360 / 60 = 6 градусов за минуту
+    minute_angle = -(now.minute * 6)  
     second_angle = -(now.second * 6)
     
-    # Отображаем часы без поворота фона
     screen.blit(clock_face, clock_rect)
     
     pygame.draw.circle(screen, RED, (ball_x, ball_y), BALL_RADIUS)
