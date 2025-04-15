@@ -89,7 +89,7 @@ while running:
     if random.randint(1, 100) > 98:
         coins.append(generate_coin())
     
-
+    update_coins()
     
     score_text = pygame.font.Font(None, 36).render(f"Coins: {coin_count}", True, YELLOW)
     screen.blit(score_text, (WIDTH - 150, 10))
