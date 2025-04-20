@@ -8,12 +8,13 @@ def get_connection():
         database="postgres",
         user="postgres",
         password="deti0609",
-        options="-c client_encoding=utf8"  
+        options="-c client_encoding=utf8"
     )
 
 def create_table():
     conn = get_connection()
     cur = conn.cursor()
+    cur.execute("DROP TABLE IF EXISTS phonebook;")
     cur.execute("""
         CREATE TABLE IF NOT EXISTS phonebook (
             id SERIAL PRIMARY KEY,
@@ -21,7 +22,6 @@ def create_table():
             phone VARCHAR(20) NOT NULL
         );
     """)
-
     cur.execute("SELECT COUNT(*) FROM phonebook;")
     count = cur.fetchone()[0]
     if count == 0:
@@ -93,7 +93,7 @@ def delete_entry():
     conn.close()
 
 def main():
-    create_table() 
+    create_table()
     
     while True:
         print("\nPhoneBook Menu:")
