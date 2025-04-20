@@ -1,92 +1,123 @@
+import psycopg2
+import csv
+import json
 
-CREATE TABLE IF NOT EXISTS phonebook (
-    id SERIAL PRIMARY KEY,
-    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-    phone VARCHAR(20) NOT NULL
-);
+def get_connection():
+    return psycopg2.connect(
+        host="localhost",
+        database="postgres",
+        user="postgres",
+        password="deti0609",
+        options="-c client_encoding=utf8"  
+    )
 
-CREATE OR REPLACE FUNCTION get_users_by_pattern(pattern TEXT)
-RETURNS TABLE (id INT, username VARCHAR, phone TEXT) AS $$
-BEGIN
-    RETURN QUERY
-    SELECT u.id, u.username, p.phone
-    FROM users u
-    JOIN phonebook p ON u.id = p.user_id
-    WHERE u.username ILIKE '%' || pattern || '%' 
-       OR p.phone ILIKE '%' || pattern || '%';
-END;
-$$ LANGUAGE plpgsql;
+def create_table():
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS phonebook (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(50) NOT NULL,
+            phone VARCHAR(20) NOT NULL
+        );
+    """)
 
-CREATE OR REPLACE PROCEDURE insert_or_update_user(p_username TEXT, p_phone TEXT)
-LANGUAGE plpgsql AS $$
-DECLARE
-    uid INT;
-BEGIN
-    SELECT id INTO uid FROM users WHERE username = p_username;
+    cur.execute("SELECT COUNT(*) FROM phonebook;")
+    count = cur.fetchone()[0]
+    if count == 0:
+        initial_data = [
+            ("Alice", "1234567890"),
+            ("Bob", "9876543210"),
+            ("Charlie", "5556667777")
+        ]
+        for name, phone in initial_data:
+            cur.execute("INSERT INTO phonebook (name, phone) VALUES (%s, %s)", (name, phone))
+    conn.commit()
+    cur.close()
+    conn.close()
 
-    IF uid IS NULL THEN
-        INSERT INTO users (username) VALUES (p_username) RETURNING id INTO uid;
-        INSERT INTO user_scores (user_id) VALUES (uid);
-        INSERT INTO phonebook (user_id, phone) VALUES (uid, p_phone);
-    ELSE
-        UPDATE phonebook SET phone = p_phone WHERE user_id = uid;
-    END IF;
-END;
-$$;
+def query_data():
+    filter_value = input("Search by name or phone: ")
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM get_records_by_pattern(%s)", (filter_value,))
+    rows = cur.fetchall()
+    for row in rows:
+        print(row)
+    cur.close()
+    conn.close()
 
-CREATE OR REPLACE PROCEDURE insert_many_users(p_usernames TEXT[], p_phones TEXT[])
-LANGUAGE plpgsql AS $$
-DECLARE
-    i INT := 1;
-    uid INT;
-BEGIN
-    CREATE TEMP TABLE IF NOT EXISTS invalid_users (username TEXT, phone TEXT) ON COMMIT DROP;
+def insert_or_update_user():
+    name = input("Enter name: ")
+    phone = input("Enter phone: ")
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("CALL insert_or_update_user(%s, %s)", (name, phone))
+    conn.commit()
+    cur.close()
+    conn.close()
 
-    WHILE i <= array_length(p_usernames, 1) LOOP
-        IF p_phones[i] !~ '^\+?[0-9]{10,15}$' THEN
-            INSERT INTO invalid_users VALUES (p_usernames[i], p_phones[i]);
-        ELSE
-            SELECT id INTO uid FROM users WHERE username = p_usernames[i];
+def insert_many_users():
+    users_list = [
+        {"name": "Alice", "phone": "1234567890"},
+        {"name": "Bob", "phone": "9876543210"},
+        {"name": "Charlie", "phone": "5556667777"},
+        {"name": "David", "phone": "0012345678"}
+    ]
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("CALL insert_multiple_users(%s)", [json.dumps(users_list)])
+    conn.commit()
+    cur.close()
+    conn.close()
 
-            IF uid IS NULL THEN
-                INSERT INTO users (username) VALUES (p_usernames[i]) RETURNING id INTO uid;
-                INSERT INTO user_scores (user_id) VALUES (uid);
-                INSERT INTO phonebook (user_id, phone) VALUES (uid, p_phones[i]);
-            ELSE
-                UPDATE phonebook SET phone = p_phones[i] WHERE user_id = uid;
-            END IF;
-        END IF;
-        i := i + 1;
-    END LOOP;
-END;
-$$;
-SELECT * FROM invalid_users;
+def query_paginated_data():
+    limit = int(input("Enter limit: "))
+    offset = int(input("Enter offset: "))
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM get_paginated_records(%s, %s)", (limit, offset))
+    rows = cur.fetchall()
+    for row in rows:
+        print(row)
+    cur.close()
+    conn.close()
 
-CREATE OR REPLACE FUNCTION get_users_paged(p_limit INT, p_offset INT)
-RETURNS TABLE (id INT, username TEXT, phone TEXT) AS $$
-BEGIN
-    RETURN QUERY
-    SELECT u.id, u.username, p.phone
-    FROM users u
-    JOIN phonebook p ON u.id = p.user_id
-    ORDER BY u.id
-    LIMIT p_limit OFFSET p_offset;
-END;
-$$ LANGUAGE plpgsql;
+def delete_entry():
+    value = input("Enter name or phone to delete: ")
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("CALL delete_user_by_name_or_phone(%s)", (value,))
+    conn.commit()
+    cur.close()
+    conn.close()
 
+def main():
+    create_table() 
+    
+    while True:
+        print("\nPhoneBook Menu:")
+        print("1. Insert or Update User")
+        print("2. Insert Multiple Users")
+        print("3. Query Paginated Data")
+        print("4. Delete Entry")
+        print("5. Exit")
+        
+        choice = input("Choose an option: ")
+        
+        if choice == "1":
+            insert_or_update_user()
+        elif choice == "2":
+            insert_many_users()
+        elif choice == "3":
+            query_paginated_data()
+        elif choice == "4":
+            delete_entry()
+        elif choice == "5":
+            print("Exiting...")
+            break
+        else:
+            print("Invalid choice. Please try again.")
 
-CREATE OR REPLACE PROCEDURE delete_user_by_username_or_phone(p_input TEXT)
-LANGUAGE plpgsql AS $$
-DECLARE
-    uid INT;
-BEGIN
-    SELECT u.id INTO uid
-    FROM users u
-    LEFT JOIN phonebook p ON u.id = p.user_id
-    WHERE u.username = p_input OR p.phone = p_input;
-
-    IF uid IS NOT NULL THEN
-        DELETE FROM users WHERE id = uid;
-    END IF;
-END;
-$$;
+if __name__ == "__main__":
+    main()
