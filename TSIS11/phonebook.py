@@ -41,6 +41,11 @@ def query_data():
 def insert_or_update_user():
     name = input("Enter name: ")
     phone = input("Enter phone: ")
+
+    if len(phone) != 11 or phone[0] != '8' or not phone.isdigit():
+        print("Номер телефона должен быть 11 символов, начинаться с 8 и содержать только цифры.")
+        return
+
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("""
@@ -65,6 +70,10 @@ def insert_many_users():
     cur = conn.cursor()
 
     for user in users_list:
+        if len(user["phone"]) != 11 or user["phone"][0] != '8' or not user["phone"].isdigit():
+            print(f"Неверный номер телефона для пользователя {user['name']}: {user['phone']}")
+            continue
+        
         cur.execute("SELECT id FROM phonebook WHERE name = %s", (user["name"],))
         existing_user = cur.fetchone()
 
@@ -104,6 +113,16 @@ def delete_entry():
     cur.close()
     conn.close()
 
+def get_all_records():
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM phonebook;")
+    rows = cur.fetchall()
+    for row in rows:
+        print(row)
+    cur.close()
+    conn.close()
+
 def main():
     create_table()
     
@@ -113,7 +132,8 @@ def main():
         print("2. Insert Multiple Users")
         print("3. Query Paginated Data")
         print("4. Delete Entry")
-        print("5. Exit")
+        print("5. Show All Records")
+        print("6. Exit")
         
         choice = input("Choose an option: ")
         
@@ -126,6 +146,8 @@ def main():
         elif choice == "4":
             delete_entry()
         elif choice == "5":
+            get_all_records()
+        elif choice == "6":
             print("Exiting...")
             break
         else:
