@@ -18,20 +18,10 @@ def create_table():
     cur.execute("""
         CREATE TABLE IF NOT EXISTS phonebook (
             id SERIAL PRIMARY KEY,
-            name VARCHAR(50) NOT NULL,
+            name VARCHAR(50) UNIQUE NOT NULL,
             phone VARCHAR(20) NOT NULL
         );
     """)
-    cur.execute("SELECT COUNT(*) FROM phonebook;")
-    count = cur.fetchone()[0]
-    if count == 0:
-        initial_data = [
-            ("Alice", "1234567890"),
-            ("Bob", "9876543210"),
-            ("Charlie", "5556667777")
-        ]
-        for name, phone in initial_data:
-            cur.execute("INSERT INTO phonebook (name, phone) VALUES (%s, %s)", (name, phone))
     conn.commit()
     cur.close()
     conn.close()
@@ -40,7 +30,8 @@ def query_data():
     filter_value = input("Search by name or phone: ")
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM get_records_by_pattern(%s)", (filter_value,))
+    cur.execute("SELECT * FROM phonebook WHERE name ILIKE %s OR phone ILIKE %s", 
+                (f'%{filter_value}%', f'%{filter_value}%'))
     rows = cur.fetchall()
     for row in rows:
         print(row)
@@ -52,7 +43,12 @@ def insert_or_update_user():
     phone = input("Enter phone: ")
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("CALL insert_or_update_user(%s, %s)", (name, phone))
+    cur.execute("""
+        INSERT INTO phonebook (name, phone)
+        VALUES (%s, %s)
+        ON CONFLICT (name) 
+        DO UPDATE SET phone = EXCLUDED.phone
+    """, (name, phone))
     conn.commit()
     cur.close()
     conn.close()
@@ -64,9 +60,25 @@ def insert_many_users():
         {"name": "Charlie", "phone": "5556667777"},
         {"name": "David", "phone": "0012345678"}
     ]
+    
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("CALL insert_multiple_users(%s)", [json.dumps(users_list)])
+
+    for user in users_list:
+        cur.execute("SELECT id FROM phonebook WHERE name = %s", (user["name"],))
+        existing_user = cur.fetchone()
+
+        if existing_user:
+            cur.execute(
+                "UPDATE phonebook SET phone = %s WHERE name = %s",
+                (user["phone"], user["name"])
+            )
+        else:
+            cur.execute(
+                "INSERT INTO phonebook (name, phone) VALUES (%s, %s)",
+                (user["name"], user["phone"])
+            )
+
     conn.commit()
     cur.close()
     conn.close()
@@ -76,7 +88,7 @@ def query_paginated_data():
     offset = int(input("Enter offset: "))
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM get_paginated_records(%s, %s)", (limit, offset))
+    cur.execute("SELECT * FROM phonebook LIMIT %s OFFSET %s", (limit, offset))
     rows = cur.fetchall()
     for row in rows:
         print(row)
@@ -87,7 +99,7 @@ def delete_entry():
     value = input("Enter name or phone to delete: ")
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("CALL delete_user_by_name_or_phone(%s)", (value,))
+    cur.execute("DELETE FROM phonebook WHERE name = %s OR phone = %s", (value, value))
     conn.commit()
     cur.close()
     conn.close()
