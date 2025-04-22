@@ -6,7 +6,7 @@ def get_connection():
         host="localhost",
         database="postgres",
         user="postgres",
-        password="deti06091"
+        password="deti0609"
     )
 
 def create_table():
